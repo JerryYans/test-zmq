@@ -1,7 +1,6 @@
 <?php
 $a = $argv[1];
 $b = $argv[2];
-
 if (!$a || !$b) {
     die("Usage:prog <expression> <expression>\n");
 }

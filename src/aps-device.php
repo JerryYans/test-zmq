@@ -5,15 +5,18 @@ require_once dirname(__FILE__) . '/aps-functions.php';
  */
 class APSDevice {
     const VERSION = 'APS10';
+    public $file = "";
+    private $log_info = "";
 
     public function __construct($context, $frontend, $backend) {
+        $this->file = fopen("/var/log/zmq/test.txt","a+");
         $socket = new ZMQSocket($context, ZMQ::SOCKET_XREP);
-        $socket->setsockopt(ZMQ::SOCKOPT_LINGER, 0);        
+        $socket->setsockopt(ZMQ::SOCKOPT_LINGER, 0);
         $socket->bind($frontend);
         $this->socket_c = $socket;
 
         $socket = new ZMQSocket($context, ZMQ::SOCKET_XREP);
-        $socket->setsockopt(ZMQ::SOCKOPT_LINGER, 0);        
+        $socket->setsockopt(ZMQ::SOCKOPT_LINGER, 0);
         $socket->bind($backend);
         $this->socket_w = $socket;
 
@@ -44,22 +47,24 @@ class APSDevice {
                 }
             }
         }
+        fwrite($this->file, " device run end \n;");
+        fclose($this->file);
     }
 
     protected function client_process() {
         $worker = array_shift($this->workers);
         $w = @array_shift(unpack('H*', $worker));
-        echo "$w\n";
-
         $frames = aps_recv_frames($this->socket_c);
 
         list($envelope, $message) = aps_envelope_unwrap($frames);
         $version = array_shift($message);
-        
+
         // TODO: check expiry?
 
         $frames = array($worker, '', self::VERSION, chr(0x00));
         $frames = array_merge($frames, $envelope, array(''), $message);
+        echo "send frams to work \n info:".print_r($frames)."\n";
+        fwrite($this->file, " device run send_frames to work ;\n");
         aps_send_frames($this->socket_w, $frames);
     }
 
@@ -75,6 +80,8 @@ class APSDevice {
             list($envelope, $message) = aps_envelope_unwrap($message);
             array_unshift($message, self::VERSION);
             $frames = aps_envelope_wrap($envelope, $message);
+            echo "send frams to client \n info:".print_r($frames)."\n";
+            fwrite($this->file, " device run send_frames to client ;\n");
             aps_send_frames($this->socket_c, $frames);
             array_push($this->workers, $worker);
 

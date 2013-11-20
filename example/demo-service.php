@@ -1,8 +1,10 @@
 <?php
+header("Content-type:text/html;charset=utf-8");
 require_once dirname(__FILE__) . '/../src/aps-device.php';
 
 function fork_and_exec($cmd, $args=array()) {
     $pid = pcntl_fork();
+    echo 'open thread pid:'.$pid."\n";
     if ($pid > 0) {
         return $pid;
     } else if ($pid == 0) {
@@ -21,7 +23,6 @@ $backend = 'tcp://127.0.0.1:5001';
 
 $device = new APSDevice($context, $frontend, $backend);
 
-print_r($argv);
 if (isset($argv[1])) {
     $c = $argv[1];
 } else {
@@ -39,6 +40,8 @@ register_shutdown_function(function($pids) {
     }
 }, $pids);
 
+echo "APSDevice run start \n";
 
 $device->run();
 
+echo "run end \n";

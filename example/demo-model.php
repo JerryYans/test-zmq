@@ -2,7 +2,7 @@
 class DemoModel {
     function md5($data) {
         return md5($data);
-    } 
+    }
 
     function sha($data) {
         return sha1($data);
@@ -10,6 +10,7 @@ class DemoModel {
 
     function sleep_for($second) {
         sleep($second);
-        return "Sleep $second";
+
+        return "demo model doing somework. Sleep $second,end return num " . round(100);
     }
 }

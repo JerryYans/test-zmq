@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+
 require_once dirname(__FILE__) . '/aps-functions.php';
 
 /**
@@ -83,6 +85,7 @@ class APSClient {
      */
     public static function wait_for_replies($timeout = NULL) {
         $poll = new ZMQPoll();
+
         foreach (self::$sockets as $socket) {
             $poll->add($socket, ZMQ::POLL_IN);
         }
@@ -95,6 +98,7 @@ class APSClient {
         }
         while (count(self::$pending_requests) > 0) {
             $events = $poll->poll($readable, $writeable, $timeout_micro);
+
             if ($events == 0) {
                 break;
             }
@@ -127,7 +131,7 @@ class APSClient {
     protected static function store_reply($sequence, $reply, $status) {
         self::$replies[$sequence] = array($reply, $status);
     }
-    
+
     /**
      */
     protected static function process_reply($socket) {
