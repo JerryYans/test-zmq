@@ -7,14 +7,20 @@ class APSWorker {
     const VERSION = 'APS10';
     public $file = "";
     private $log_info = "";
+    private $socket_id = 0;
 
     public function __construct($context, $endpoint) {
         $this->file = fopen("/var/log/zmq/test.txt","a+");
 
+        $this->socket_id = strval(posix_getpid());
         $socket = new ZMQSocket($context, ZMQ::SOCKET_XREQ);
         $socket->setsockopt(ZMQ::SOCKOPT_LINGER, 0);
-        $socket->setsockopt(ZMQ::SOCKOPT_IDENTITY, strval(posix_getpid()));
+        $socket->setsockopt(ZMQ::SOCKOPT_IDENTITY, $this->socket_id);
         $socket->connect($endpoint);
+
+        $str = "work ".worker_id." new socket:{$this->socket_id}, endpoint:{$endpoint}; \n;";
+        fwrite($this->file, $str);
+
         $this->socket = $socket;
 
         $this->interval = 1000 * 1000;
@@ -36,6 +42,7 @@ class APSWorker {
             if (posix_getppid() == 1) {
                 break;
             }
+            fwrite($this->file, "work ".worker_id." polling ;\n");
             if ($events) {
                 $this->process();
             } else {
@@ -48,13 +55,16 @@ class APSWorker {
     }
 
     protected function send_heartbeat_frames() {
-        $this->log_info = " work ".worker_id." send_heartbeat_frames; \n";
+        $now_time = date("Y-m-d H:i:s",time());
+        $this->log_info = " work ".worker_id." send_heartbeat_frames, time: $now_time ;\n";
         aps_send_frames($this->socket, array('', self::VERSION, chr(0x01)));
     }
 
     protected function process() {
 
         $frames = aps_recv_frames($this->socket);
+
+        $this->log_info .= "process info :".json_encode($frames).";\n";
 
         list($envelope, $message) = aps_envelope_unwrap($frames);
 
