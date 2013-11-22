@@ -8,6 +8,10 @@ class APSWorker {
     public $file = "";
     private $log_info = "";
     private $socket_id = 0;
+    /**
+     * @var ZMQSocket
+     */
+    private $socket = null;
 
     public function __construct($context, $endpoint) {
         $this->file = fopen("/var/log/zmq/test.txt","a+");
@@ -17,8 +21,9 @@ class APSWorker {
         $socket->setsockopt(ZMQ::SOCKOPT_LINGER, 0);
         $socket->setsockopt(ZMQ::SOCKOPT_IDENTITY, $this->socket_id);
         $socket->connect($endpoint);
+        define("worker_id", $this->socket_id);
 
-        $str = "work ".worker_id." new socket:{$this->socket_id}, endpoint:{$endpoint}; \n;";
+        $str = "work ".worker_id." new socket:{$this->socket_id}, endpoint:{$endpoint}; \n";
         fwrite($this->file, $str);
 
         $this->socket = $socket;
@@ -30,7 +35,7 @@ class APSWorker {
 
     public function run() {
         $r_info = "";
-        fwrite($this->file, "work ".worker_id." run start \n;");
+        fwrite($this->file, "work ".worker_id." run start ;\n");
 
         $this->send_heartbeat_frames();
         $poll = new ZMQPoll();
@@ -64,9 +69,11 @@ class APSWorker {
 
         $frames = aps_recv_frames($this->socket);
 
-        $this->log_info .= "process info :".json_encode($frames).";\n";
 
         list($envelope, $message) = aps_envelope_unwrap($frames);
+
+        $this->log_info .= "work ".worker_id."; recv socket info, envelope: ".json_encode($envelope).";\n";
+        $this->log_info .= "work ".worker_id."; recv socket info, message: ".json_encode($message).";\n";
 
         $version = array_shift($message);
         $command = array_shift($message);
@@ -94,13 +101,10 @@ class APSWorker {
         if ($params !== NULL) {
             $params = msgpack_unpack($params);
         }
-
-        $reply = call_user_func_array(array($this->delegate, $method), $params);
-
         $this->log_info .= "work ".worker_id."; sequence:$sequence,timestamp:$timestamp, envelope:".json_encode($envelope).";\n";
-        $this->log_info .= "call_user_func:$method, parame:".json_encode($params).";";
-        $this->log_info .= "deal back info:$reply,send result to client..\n";
-
+        $this->log_info .= "work ".worker_id."; call_user_func:$method, parame:".json_encode($params).";\n";
+        $reply = call_user_func_array(array($this->delegate, $method), $params);
+        $this->log_info .= "work ".worker_id."; deal back info:$reply;\n";
         $now = aps_millitime();
         $this->send_reply_frames($envelope, $sequence, $now, 200, $reply);
     }
@@ -112,6 +116,7 @@ class APSWorker {
         if ($reply !== NULL) {
             $frames[] = msgpack_pack($reply);
         }
+        $this->log_info .= "work ".worker_id."; send result to device..\n\n";
         aps_send_frames($this->socket, $frames);
     }
 }

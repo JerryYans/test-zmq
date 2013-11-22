@@ -7,7 +7,7 @@ echo "\nStart async RPC\n";
 $bt = aps_microtime();
 $client = new APSClient($context, array('tcp://127.0.0.1:5000'));
 
-$req_seq = $client->md5("abc");
+//$req_seq = $client->md5("abc");
 
 $client->start_request('sleep_for', array('4'),
     function($reply, $status) {

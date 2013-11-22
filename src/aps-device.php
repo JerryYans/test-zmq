@@ -47,15 +47,16 @@ class APSDevice {
                 }
             }
         }
-        fwrite($this->file, " device run end \n;");
+        fwrite($this->file, "device run end \n;");
         fclose($this->file);
     }
 
     protected function client_process() {
+        $log_info = "";
         $worker = array_shift($this->workers);
         $w = @array_shift(unpack('H*', $worker));
         $frames = aps_recv_frames($this->socket_c);
-
+        $log_info = "device run recv frames from client ;\n";
         list($envelope, $message) = aps_envelope_unwrap($frames);
         $version = array_shift($message);
 
@@ -64,13 +65,15 @@ class APSDevice {
         $frames = array($worker, '', self::VERSION, chr(0x00));
         $frames = array_merge($frames, $envelope, array(''), $message);
         echo "send frams to work \n info:".print_r($frames)."\n";
-        fwrite($this->file, " device run send_frames to work ;\n");
+        $log_info .= "device run send_frames to work ;\n";
+        fwrite($this->file, $log_info);
         aps_send_frames($this->socket_w, $frames);
     }
 
     protected function worker_process() {
         $frames = aps_recv_frames($this->socket_w);
-
+        $log_info = "";
+        $log_info = "device run recv from work socket ;\n";
         list($envelope, $message) = aps_envelope_unwrap($frames);
         $worker = $envelope[0];
         $version = array_shift($message);
@@ -81,7 +84,7 @@ class APSDevice {
             array_unshift($message, self::VERSION);
             $frames = aps_envelope_wrap($envelope, $message);
             echo "send frams to client \n info:".print_r($frames)."\n";
-            fwrite($this->file, " device run send_frames to client ;\n");
+            $log_info .= "device run send frames to client socket ;\n\n";
             aps_send_frames($this->socket_c, $frames);
             array_push($this->workers, $worker);
 
@@ -93,6 +96,7 @@ class APSDevice {
         } elseif ($command == 0x02) {
             // TODO:
         }
+        fwrite($this->file, $log_info);
     }
 }
 

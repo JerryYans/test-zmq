@@ -8,12 +8,17 @@ require_once dirname(__FILE__) . '/aps-functions.php';
  */
 class APSClient {
     const VERSION = 'APS10';
+    private $file = null;
+    private static $static_file = null;
+    private $log_info = "";
 
     /**
      * @params $context ZMQContext
      * @params $endpoints array of endpoint the client will connect to.
      */
     public function __construct($context, $endpoints) {
+        $this->file = fopen("/var/log/zmq/test.txt","a+");
+
         $socket = new ZMQSocket($context, ZMQ::SOCKET_XREQ);
         $socket->setsockopt(ZMQ::SOCKOPT_LINGER, 0);
         $socket->setsockopt(ZMQ::SOCKOPT_HWM, 1000);
@@ -28,6 +33,7 @@ class APSClient {
 
     public function __destruct () {
         $i = array_search($this->socket, self::$sockets, true);
+        fclose($this->file);
         unset(self::$sockets[$i]);
     }
 
@@ -59,6 +65,8 @@ class APSClient {
      */
     public function start_request($method, $params, $callback = NULL, $expiry = NULL) {
         $sequence = ++self::$sequence;
+
+
         $timestamp = aps_millitime();
         if ($expiry === NULL) {
             $expiry = $this->expiry;
@@ -69,7 +77,7 @@ class APSClient {
         $frames[] = msgpack_pack(array($sequence, $timestamp, $expiry));
         $frames[] = $method;
         $frames[] = msgpack_pack($params);
-
+        fwrite($this->file, "client send frames to device socket, frames info:".json_encode($frames).";\n");
         aps_send_frames($this->socket, $frames);
 
         self::$pending_requests[$sequence] = array($this, $callback);
@@ -96,13 +104,17 @@ class APSClient {
         } else {
             $timeout_micro = -1;
         }
+        if (empty(self::$static_file)){
+            self::$static_file = fopen("/var/log/zmq/test.txt","a+");
+        }
+
         while (count(self::$pending_requests) > 0) {
             $events = $poll->poll($readable, $writeable, $timeout_micro);
 
             if ($events == 0) {
                 break;
             }
-
+            fwrite(self::$static_file, "client polling ;\n");
             foreach ($readable as $socket) {
                 self::process_reply($socket);
             }
@@ -113,6 +125,9 @@ class APSClient {
                     break;
                 }
             }
+        }
+        if (!empty(self::$static_file)){
+            fclose(self::$static_file);
         }
         return count(self::$pending_requests);
     }
@@ -136,6 +151,11 @@ class APSClient {
      */
     protected static function process_reply($socket) {
         $frames = aps_recv_frames($socket);
+        if (empty(self::$static_file)){
+            self::$static_file = fopen("/var/log/zmq/test.txt","a+");
+        }
+
+        fwrite(self::$static_file, "client recv frames from device socket, frames info:".json_encode($frames).";\n");
         list($envelope, $message) = aps_envelope_unwrap($frames);
         $version = array_shift($message);
         list($sequence, $timestamp, $status) = msgpack_unpack(array_shift($message));
