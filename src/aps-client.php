@@ -57,7 +57,7 @@ class APSClient {
 
     /**
      */
-    public function start_request($method, $params, $expiry = NULL) {
+    public function start_request($method, $params, $callback = NULL, $expiry = NULL) {
         $sequence = ++self::$sequence;
         $timestamp = aps_millitime();
         if ($expiry === NULL) {
